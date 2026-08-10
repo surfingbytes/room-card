@@ -124,5 +124,10 @@ export interface ActionHandler extends HTMLElement {
 }
 
 export interface ActionHandlerElement extends HTMLElement {
-    actionHandler?: boolean;
+    actionHandler?: {
+        options: ActionHandlerOptions;
+        start?: (ev: Event) => void;
+        end?: (ev: Event) => void;
+        handleKeyUp?: (ev: KeyboardEvent) => void;
+    };
 }

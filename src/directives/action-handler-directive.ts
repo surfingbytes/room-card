@@ -5,7 +5,7 @@ import { ActionHandlerDetail, ActionHandlerOptions } from 'custom-card-helpers/d
 import { fireEvent } from 'custom-card-helpers';
 import { ActionHandlerElement } from '../types/room-card-types';
 
-const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.maxTouchPoints > 0;
+const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 declare global {
   interface HASSDomEvents {
@@ -22,6 +22,11 @@ class ActionHandler extends HTMLElement implements ActionHandler {
   protected timer?: number;
 
   protected held = false;
+
+  private cancelled = false;
+
+  // Suppress synthetic mouse events that browsers fire after a touch tap.
+  private ignoreMouseUntil = 0;
 
   private dblClickTimeout?: number;
 
@@ -47,36 +52,60 @@ class ActionHandler extends HTMLElement implements ActionHandler {
       document.addEventListener(
         ev,
         () => {
-          clearTimeout(this.timer);
-          this.stopAnimation();
-          this.timer = undefined;
+          this.cancelled = true;
+          if (this.timer) {
+            clearTimeout(this.timer);
+            this.stopAnimation();
+            this.timer = undefined;
+          }
         },
         { passive: true },
       );
     });
   }
 
-  public bind(element: ActionHandlerElement, options: ActionHandlerOptions): void {
-    if (element.actionHandler) {
+  public bind(element: ActionHandlerElement, options: ActionHandlerOptions = {}): void {
+    if (
+      element.actionHandler &&
+      element.actionHandler.options?.hasHold === options.hasHold &&
+      element.actionHandler.options?.hasDoubleClick === options.hasDoubleClick
+    ) {
       return;
     }
-    element.actionHandler = true;
 
-    element.addEventListener('contextmenu', (ev: Event) => {
-      const e = ev || window.event;
-      if (e.preventDefault) {
-        e.preventDefault();
-      }
-      if (e.stopPropagation) {
-        e.stopPropagation();
-      }
-      e.cancelBubble = true;
-      e.returnValue = false;
-      return false;
-    });
+    if (element.actionHandler) {
+      element.removeEventListener('touchstart', element.actionHandler.start!);
+      element.removeEventListener('touchend', element.actionHandler.end!);
+      element.removeEventListener('touchcancel', element.actionHandler.end!);
+      element.removeEventListener('mousedown', element.actionHandler.start!);
+      element.removeEventListener('click', element.actionHandler.end!);
+      element.removeEventListener('keyup', element.actionHandler.handleKeyUp!);
+    } else {
+      element.addEventListener('contextmenu', (ev: Event) => {
+        const e = ev || window.event;
+        if (e.preventDefault) {
+          e.preventDefault();
+        }
+        if (e.stopPropagation) {
+          e.stopPropagation();
+        }
+        e.cancelBubble = true;
+        e.returnValue = false;
+        return false;
+      });
+    }
 
-    const start = (ev: Event): void => {
+    element.actionHandler = { options };
+
+    element.actionHandler.start = (ev: Event): void => {
+      // Ignore compatibility mouse events after a touch interaction.
+      if (ev.type === 'mousedown' && Date.now() < this.ignoreMouseUntil) {
+        return;
+      }
+
+      this.cancelled = false;
       this.held = false;
+
       let x: number;
       let y: number;
       if ((ev as TouchEvent).touches) {
@@ -87,22 +116,42 @@ class ActionHandler extends HTMLElement implements ActionHandler {
         y = (ev as MouseEvent).pageY;
       }
 
-      this.timer = window.setTimeout(() => {
-        this.startAnimation(x, y);
-        this.held = true;
-      }, this.holdTime);
+      // Only arm hold when the entity actually has a hold action.
+      if (options.hasHold) {
+        this.timer = window.setTimeout(() => {
+          this.startAnimation(x, y);
+          this.held = true;
+        }, this.holdTime);
+      }
     };
 
-    const end = (ev: Event): void => {
-      // Prevent mouse event if touch event
-      ev.preventDefault();
-      if (['touchend', 'touchcancel'].includes(ev.type) && this.timer === undefined) {
+    element.actionHandler.end = (ev: Event): void => {
+      // Ignore compatibility mouse click after a touch tap/cancel.
+      if (ev.type === 'click' && Date.now() < this.ignoreMouseUntil) {
         return;
       }
-      clearTimeout(this.timer);
-      this.stopAnimation();
-      this.timer = undefined;
-      if (this.held) {
+
+      // Abort touch gestures that moved/scrolled (cancelled via document listeners).
+      if (ev.type === 'touchcancel' || (ev.type === 'touchend' && this.cancelled)) {
+        this.ignoreMouseUntil = Date.now() + 350;
+        return;
+      }
+
+      if (ev.cancelable) {
+        ev.preventDefault();
+      }
+
+      if (ev.type === 'touchend' || ev.type === 'touchcancel') {
+        this.ignoreMouseUntil = Date.now() + 350;
+      }
+
+      if (options.hasHold) {
+        clearTimeout(this.timer);
+        this.stopAnimation();
+        this.timer = undefined;
+      }
+
+      if (options.hasHold && this.held) {
         fireEvent(element, 'action', { action: 'hold' });
       } else if (options.hasDoubleClick) {
         if ((ev.type === 'click' && (ev as MouseEvent).detail < 2) || !this.dblClickTimeout) {
@@ -120,21 +169,21 @@ class ActionHandler extends HTMLElement implements ActionHandler {
       }
     };
 
-    const handleEnter = (ev: KeyboardEvent): void => {
-      if (ev.keyCode !== 13) {
+    element.actionHandler.handleKeyUp = (ev: KeyboardEvent): void => {
+      if (ev.key !== 'Enter' && ev.keyCode !== 13) {
         return;
       }
-      end(ev);
+      element.actionHandler!.end!(ev);
     };
 
-    element.addEventListener('touchstart', start, { passive: true });
-    element.addEventListener('touchend', end);
-    element.addEventListener('touchcancel', end);
+    element.addEventListener('touchstart', element.actionHandler.start, { passive: true });
+    element.addEventListener('touchend', element.actionHandler.end);
+    element.addEventListener('touchcancel', element.actionHandler.end);
 
-    element.addEventListener('mousedown', start, { passive: true });
-    element.addEventListener('click', end);
+    element.addEventListener('mousedown', element.actionHandler.start, { passive: true });
+    element.addEventListener('click', element.actionHandler.end);
 
-    element.addEventListener('keyup', handleEnter);
+    element.addEventListener('keyup', element.actionHandler.handleKeyUp);
   }
 
   private startAnimation(x: number, y: number): void {
@@ -155,7 +204,6 @@ class ActionHandler extends HTMLElement implements ActionHandler {
   }
 }
 
-// TODO You need to replace all instances of "action-handler-boilerplate" with "action-handler-<your card name>"
 customElements.define('action-handler-roomcard', ActionHandler);
 
 const getActionHandler = (): ActionHandler => {
