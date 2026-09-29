@@ -44,6 +44,20 @@ describe('Testing util file function hideIfEntity', () => {
         } as HideIfConfig;
         expect(hideIfEntity(StubRoomCardEntity, StubHomeAssistant)).toBe(false);
     }),
+    test('Passing RoomCardEntity with hide_if entity missing from hass should return false', () => {
+        StubRoomCardEntity.hide_unavailable = false;
+        StubRoomCardEntity.stateObj.state = 'on';
+        StubHomeAssistant.states = {};
+
+        StubRoomCardEntity.hide_if = {
+            conditions: [{
+                condition: 'equals',
+                value: 'hide',
+                entity: 'sensor.missing_entity'
+            }]
+        } as HideIfConfig;
+        expect(hideIfEntity(StubRoomCardEntity, StubHomeAssistant)).toBe(false);
+    }),
     test('Passing RoomCardEntity with hide_if entity and HomeAssistant should return true', () => {
         StubRoomCardEntity.hide_unavailable = false;
         StubRoomCardEntity.entity = 'sensor.test_entity'

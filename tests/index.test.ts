@@ -465,7 +465,7 @@ describe('Testing index file class RoomCard', () => {
                 'switch.bedroom': { last_updated: '2022-01-02T00:00:00.000Z', last_changed: '2022-01-02T00:00:00.000Z' },
             });
         }),
-        test('Calling set hass should set monitoredStates', () => {
+        test('Calling set hass should seed entities missing from monitoredStates', () => {
             const roomCard = new RoomCard();
             roomCard.config = { entityIds: ['light.living_room', 'switch.bedroom'] } as RoomCardConfig;
             roomCard.monitoredStates = {
@@ -481,6 +481,25 @@ describe('Testing index file class RoomCard', () => {
             roomCard.updateMonitoredStates(hass);
 
             expect(roomCard.monitoredStates).toEqual({
+                'switch.bedroom': { last_updated: '2022-01-02T00:00:00.000Z', last_changed: '2022-01-02T00:00:00.000Z' },
+                'light.living_room': { last_updated: '2022-01-02T00:00:00.000Z', last_changed: '2022-01-02T00:00:00.000Z' },
+            });
+        }),
+        test('Calling set hass should seed monitoredStates from empty map', () => {
+            const roomCard = new RoomCard();
+            roomCard.config = { entityIds: ['light.living_room', 'switch.bedroom'] } as RoomCardConfig;
+            roomCard.monitoredStates = {};
+            const hass = {
+                states: {
+                    'light.living_room': { last_updated: '2022-01-02T00:00:00.000Z', last_changed: '2022-01-02T00:00:00.000Z' },
+                    'switch.bedroom': { last_updated: '2022-01-02T00:00:00.000Z', last_changed: '2022-01-02T00:00:00.000Z' },
+                },
+            } as unknown as HomeAssistant;
+
+            roomCard.updateMonitoredStates(hass);
+
+            expect(roomCard.monitoredStates).toEqual({
+                'light.living_room': { last_updated: '2022-01-02T00:00:00.000Z', last_changed: '2022-01-02T00:00:00.000Z' },
                 'switch.bedroom': { last_updated: '2022-01-02T00:00:00.000Z', last_changed: '2022-01-02T00:00:00.000Z' },
             });
         }),
@@ -505,6 +524,34 @@ describe('Testing index file class RoomCard', () => {
                 'light.living_room': { last_updated: '2022-01-02T00:00:00.000Z', last_changed: '2022-01-02T00:00:00.000Z' },
                 'switch.bedroom': { last_updated: '2022-01-02T00:00:00.000Z', last_changed: '2022-01-02T00:00:00.000Z' }
             });
+        }),
+        test('Calling shouldUpdate without helpers should return true for rows-only config', () => {
+            const roomCard = new RoomCard();
+            roomCard.monitoredStates = {};
+            roomCard.config = {
+                entityIds: ['light.test_entity'],
+                type: 'custom:room-card',
+                rows: [{ entities: [{ entity: 'light.test_entity' }] }],
+            } as RoomCardConfig;
+            roomCard._helpers = undefined;
+
+            const props: PropertyValues = new Map([['config', roomCard.config]]);
+
+            expect(roomCard['shouldUpdate'](props)).toBeTruthy();
+        }),
+        test('Calling shouldUpdate without helpers should return false when nested cards exist', () => {
+            const roomCard = new RoomCard();
+            roomCard.monitoredStates = {};
+            roomCard.config = {
+                entityIds: ['light.test_entity'],
+                type: 'custom:room-card',
+                cards: [{ type: 'entities', entities: ['light.test_entity'] }],
+            } as RoomCardConfig;
+            roomCard._helpers = undefined;
+
+            const props: PropertyValues = new Map([['config', roomCard.config]]);
+
+            expect(roomCard['shouldUpdate'](props)).toBeFalsy();
         }),
         test('should create a card element using the createThing function if _helpers does not exist', () => {
             const roomCard = new RoomCard();

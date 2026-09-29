@@ -48,14 +48,21 @@ export default class RoomCard extends LitElement {
         await Promise.all(Array.from(distinctTypes).map(type => customElements.whenDefined(type)));
     }
 
-    protected shouldUpdate(changedProps: PropertyValues): boolean {
-        const result = this.monitoredStates !== undefined
-            && this.config !== undefined
-            && changedProps.size > 0
-            && this._helpers !== undefined
-            && this._helpers.createCardElement !== undefined;
+    private hasNestedCards(config?: RoomCardConfig): boolean {
+        return (config?.cards?.length ?? 0) > 0;
+    }
 
-        return result;
+    protected shouldUpdate(changedProps: PropertyValues): boolean {
+        if (this.monitoredStates === undefined || this.config === undefined || changedProps.size === 0) {
+            return false;
+        }
+
+        // Nested cards need card helpers; rows/entities-only cards should render without waiting.
+        if (this.hasNestedCards(this.config) && this._helpers?.createCardElement === undefined) {
+            return false;
+        }
+
+        return true;
     }
 
     updateMonitoredStates(hass: HomeAssistant): void {
@@ -64,11 +71,15 @@ export default class RoomCard extends LitElement {
 
         for (const entityId of this.config.entityIds) {
             if (entityId in hass.states) {
-                const monitoredEntity = this.monitoredStates && this.monitoredStates[entityId];
+                const monitoredEntity = this.monitoredStates?.[entityId];
 
                 /* istanbul ignore next */
-                if (!this.monitoredStates || monitoredEntity?.last_updated < hass.states[entityId].last_updated ||
-                    monitoredEntity?.last_changed < hass.states[entityId].last_changed) {
+                // Seed entities on first sighting so late-arriving states trigger a re-render.
+                if (
+                    !monitoredEntity ||
+                    monitoredEntity.last_updated < hass.states[entityId].last_updated ||
+                    monitoredEntity.last_changed < hass.states[entityId].last_changed
+                ) {
                     anyUpdates = hass.states[entityId] !== newStates[entityId];
                     newStates[entityId] = hass.states[entityId];
                 }
@@ -98,7 +109,8 @@ export default class RoomCard extends LitElement {
 
         /* istanbul ignore next */
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        if ((window as any).loadCardHelpers) {
+        // Only load card helpers when nested cards need them.
+        if (this.hasNestedCards(config) && (window as any).loadCardHelpers) {
             this._helpers = await (window as any).loadCardHelpers();
         }
     }

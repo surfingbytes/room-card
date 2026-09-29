@@ -18,11 +18,18 @@ export const hideIfCard = (cardConfig: LovelaceCardConfig, hass: HomeAssistant) 
             let checkEntityValue = entityValue;
             if(item.entity) {                
                 const stateEntity = hass.states[item.entity];
+                if (!stateEntity) {
+                    return false;
+                }
                 checkEntityValue = item.attribute ? stateEntity.attributes[item.attribute] : stateEntity.state;
             }
 
-            if(item.attribute && !item.entity) {                
-                checkEntityValue = hass.states[cardConfig.entity].attributes[item.attribute];
+            if(item.attribute && !item.entity) {
+                const stateEntity = hass.states[cardConfig.entity];
+                if (!stateEntity) {
+                    return false;
+                }
+                checkEntityValue = stateEntity.attributes[item.attribute];
             }
     
             return checkConditionalValue(item, checkEntityValue);
@@ -43,6 +50,9 @@ export const hideIfRow = (row: RoomCardRow, hass: HomeAssistant) => {
     
             if(item.entity) {                
                 const stateEntity = hass.states[item.entity];
+                if (!stateEntity) {
+                    return false;
+                }
 
                 return checkConditionalValue(item, item.attribute ? stateEntity.attributes[item.attribute] : stateEntity.state);
             }
@@ -68,6 +78,9 @@ export const hideIfEntity = (entity: RoomCardEntity, hass: HomeAssistant) => {
             let checkEntityValue = entityValue;
             if(item.entity) {                
                 const stateEntity = hass.states[item.entity];
+                if (!stateEntity) {
+                    return false;
+                }
                 checkEntityValue = item.attribute ? stateEntity.attributes[item.attribute] : stateEntity.state;
             }
 

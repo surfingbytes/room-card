@@ -261,6 +261,27 @@ describe('Testing entity file function entityIcon', () => {
         
         expect(entityIcon(stateObj, config, hass)).toBe(undefined);
     }),
+    test('Passing config with icon conditions referencing missing entity should return undefined', () => {
+        hass.states = {};
+
+        stateObj.entity_id = 'input_boolean.test_entity';
+        stateObj.state = '20';
+        const config: RoomCardConfig = {
+            entityIds: [],
+            type: '',
+            show_icon: true,
+            icon: {
+                conditions: [{
+                    condition: 'above',
+                    value: 10,
+                    icon: 'mdi:10-icon',
+                    entity: 'sensor.missing_entity'
+                }]
+            }
+        };
+
+        expect(entityIcon(stateObj, config, hass)).toBe(undefined);
+    }),
     test('Passing config with icon iconditions with attribute should return condition', () => {    
         
         stateObj.entity_id = 'input_boolean.test_entity';
