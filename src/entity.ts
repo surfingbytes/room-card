@@ -2,7 +2,7 @@ import { secondsToDuration } from './lib/seconds_to_duration';
 import { formatNumber } from './lib/format_number';
 import { computeStateDisplay, computeStateDomain } from './lib/compute_state_display';
 import { checkConditionalValue, evalTemplate, getValue, isObject, isUnavailable, renderClasses } from './util';
-import { ActionHandlerEvent, handleAction, hasAction, HomeAssistant, stateIcon } from 'custom-card-helpers';
+import { ActionHandlerEvent, handleAction, hasAction, HomeAssistant } from 'custom-card-helpers';
 import { HomeAssistantEntity, EntityCondition, RoomCardEntity, RoomCardIcon, RoomCardConfig, EntityStyles, RoomCardRow, RoomCardAttributeTemplate } from './types/room-card-types';
 import { html, HTMLTemplateResult, LitElement } from 'lit';
 import { LAST_CHANGED, LAST_UPDATED, TIMESTAMP_FORMATS } from './lib/constants';
@@ -123,23 +123,14 @@ export const renderIcon = (stateObj: HomeAssistantEntity, config: RoomCardEntity
 
     const customIcon = entityIcon(stateObj, config, hass);
     const customStyling = templateStyling(stateObj, config, hass);
-    const condition = isObject(customIcon) ? (customIcon as EntityCondition) : undefined;
-    // Always pass a concrete MDI icon. Empty overrideIcon lets state-badge hide the
-    // icon for entity_picture / fail to paint domain defaults on slow WebViews.
-    // Style-only conditions also leave condition.icon undefined — fall back here.
-    const overrideIcon =
-        condition?.icon ||
-        (!condition ? (customIcon as string | null | undefined) : undefined) ||
-        stateObj.attributes.icon ||
-        stateIcon(stateObj);
 
     return html`<state-badge
         class="icon-small ${classes}"
         .hass=${hass}
         .stateObj="${stateObj}"
-        .overrideIcon="${overrideIcon}"
+        .overrideIcon="${isObject(customIcon) ? (customIcon as EntityCondition).icon : customIcon as string}"
         .stateColor="${config.state_color}"
-        style="${customStyling ?? entityStyles(condition?.styles, hass.states[config.entity], hass)}"
+        style="${customStyling ?? entityStyles(isObject(customIcon) ? (customIcon as EntityCondition).styles : null, hass.states[config.entity], hass)}"
     ></state-badge>`;
 }
 
