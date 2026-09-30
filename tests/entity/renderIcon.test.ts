@@ -92,11 +92,11 @@ describe('Testing entity file function renderIcon', () => {
     test.each`
     state | condition | value | icon | expected
     ${'on'}  ${'equals'}  ${'on'}  ${'mdi:equal-icon'}   ${'mdi:equal-icon'}
-    ${'on'}  ${'equals'}  ${'off'}  ${'mdi:equal-icon'}   ${''}
+    ${'on'}  ${'equals'}  ${'off'}  ${'mdi:equal-icon'}   ${'mdi:desk'}
     ${'55'}  ${'below'}  ${'60'}  ${'mdi:below-icon'}   ${'mdi:below-icon'}
-    ${'70'}  ${'below'}  ${'60'}  ${'mdi:below-icon'}   ${''}
+    ${'70'}  ${'below'}  ${'60'}  ${'mdi:below-icon'}   ${'mdi:desk'}
     ${'55'}  ${'above'}  ${'50'}  ${'mdi:above-icon'}   ${'mdi:above-icon'}
-    ${'45'}  ${'above'}  ${'50'}  ${'mdi:above-icon'}   ${''}
+    ${'45'}  ${'above'}  ${'50'}  ${'mdi:above-icon'}   ${'mdi:desk'}
     `('Passing HomeAssistantEntity, RoomCardConfig and HomeAssistant should render expected icon', async ({ state, condition, value, icon, expected }) => {   
 
         stateObj.state = state;
@@ -213,11 +213,11 @@ describe('Testing entity file function renderIcon', () => {
     test.each`
     state | condition | value | icon | expected
     ${'on'}  ${'equals'}  ${'on'}  ${'mdi:equal-icon'}   ${'mdi:equal-icon'}
-    ${'on'}  ${'equals'}  ${'off'}  ${'mdi:equal-icon'}   ${''}
+    ${'on'}  ${'equals'}  ${'off'}  ${'mdi:equal-icon'}   ${'mdi:desk'}
     ${'55'}  ${'below'}  ${'60'}  ${'mdi:below-icon'}   ${'mdi:below-icon'}
-    ${'70'}  ${'below'}  ${'60'}  ${'mdi:below-icon'}   ${''}
+    ${'70'}  ${'below'}  ${'60'}  ${'mdi:below-icon'}   ${'mdi:desk'}
     ${'55'}  ${'above'}  ${'50'}  ${'mdi:above-icon'}   ${'mdi:above-icon'}
-    ${'45'}  ${'above'}  ${'50'}  ${'mdi:above-icon'}   ${''}
+    ${'45'}  ${'above'}  ${'50'}  ${'mdi:above-icon'}   ${'mdi:desk'}
     `('Passing HomeAssistantEntity, RoomCardEntity and HomeAssistant should render expected icon', async ({ state, condition, value, icon, expected }) => {   
 
         stateObj.state = state;
@@ -238,6 +238,30 @@ describe('Testing entity file function renderIcon', () => {
         const htmlResult = getRenderString(result);
 
         expect(htmlResult).toMatch(`<state-badge class="icon-small " .hass= .stateObj="" .overrideIcon="${expected}" .stateColor="" style="" ></state-badge>`);
+    }),
+    test('Passing style-only icon condition should still force a concrete overrideIcon', async () => {
+        stateObj.state = 'playing';
+        stateObj.entity_id = 'media_player.test';
+        stateObj.attributes = { entity_picture: '/api/media_player_proxy/media_player.test' };
+        const entity: RoomCardEntity = {
+            entity: 'media_player.test',
+            stateObj: stateObj,
+            show_icon: true,
+            icon: {
+                conditions: [{
+                    condition: 'not_equals',
+                    value: 'paused',
+                    styles: { color: 'red' }
+                }]
+            }
+        };
+
+        const result = renderIcon(stateObj, entity, hass);
+        const htmlResult = getRenderString(result);
+
+        expect(htmlResult).toContain('.overrideIcon="');
+        expect(htmlResult).not.toContain('.overrideIcon=""');
+        expect(htmlResult).toContain('color: red');
     }),
     test('Passing HomeAssistantEntity, RoomCardEntity and HomeAssistant and styles should render styles', async () => {   
 
